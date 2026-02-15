@@ -1,0 +1,42 @@
+name: Real-Time Data Collection
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Paleidžiame kas 6 valandas
+  workflow_dispatch:      # Leidžiame paleisti rankiniu būdu
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install websockets pandas pyarrow requests
+
+      - name: Run Collection (Liquidations & Bars)
+        run: |
+          # Paleidžiame abu skriptus fone ir laukiame jų pabaigos (patys sustos po 5.5h)
+          python collect_liquidations.py & python collect_bars.py
+        env:
+          PYTHONUNBUFFERED: 1
+
+      - name: Run Daily Archive (Optional)
+        run: |
+          python archive_data.py
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          git add data/
+          git commit -m "Add new data: $(date +'%Y-%m-%d %H:%M')" || echo "No changes to commit"
+          git push
